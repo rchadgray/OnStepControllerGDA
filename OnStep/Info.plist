@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Location — used to compute Local Sidereal Time and send site coordinates to the mount -->
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>OnStep uses your location to calculate the local sidereal time and to send your GPS coordinates to the telescope mount for accurate GoTo alignment.</string>
+
+    <!-- Bluetooth — used to connect to the mount's BLE UART module -->
+    <key>NSBluetoothAlwaysUsageDescription</key>
+    <string>OnStep uses Bluetooth to communicate with your telescope mount controller over BLE when a WiFi connection is not available.</string>
+
+    <!-- Local Network — used for the WiFi TCP connection to the mount's SmartWebServer -->
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>OnStep connects to your telescope mount over your local WiFi network using a TCP socket to send and receive LX200 commands.</string>
+
+    <!-- Bonjour services listed so iOS shows the local network permission prompt correctly -->
+    <key>NSBonjourServices</key>
+    <array>
+        <string>_http._tcp</string>
+    </array>
+</dict>
+</plist>
