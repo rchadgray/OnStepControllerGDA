@@ -173,8 +173,12 @@ struct SkyChartView: View {
         drawOverheadLimit(in: ctx, size: size)
         drawMeridianLimits(in: ctx, size: size)
         let projections = vm.visibleProjections(for: size)
-        for (obj, pt) in projections where obj.type != .star { drawDSO(obj,  at: pt, in: ctx) }
-        for (obj, pt) in projections where obj.type == .star { drawStar(obj, at: pt, in: ctx) }
+        let catalogTypes: Set<SkyObjectType> = [.star, .openCluster, .globularCluster, .nebula, .galaxy, .planetaryNebula]
+        for (obj, pt) in projections where catalogTypes.contains(obj.type) && obj.type != .star { drawDSO(obj, at: pt, in: ctx) }
+        for (obj, pt) in projections where obj.type == .star   { drawStar(obj,   at: pt, in: ctx) }
+        for (obj, pt) in projections where obj.type == .planet { drawPlanet(obj, at: pt, in: ctx) }
+        for (obj, pt) in projections where obj.type == .moon   { drawMoon(obj,   at: pt, in: ctx) }
+        for (obj, pt) in projections where obj.type == .sun    { drawSun(obj,    at: pt, in: ctx) }
         drawMountCrosshair(in: ctx, size: size)
         drawCardinalLabels(in: ctx, size: size)
         drawLegend(in: ctx, size: size)
@@ -241,7 +245,7 @@ struct SkyChartView: View {
             ctx.stroke(Path(ellipseIn: CGRect(x: pt.x-s, y: pt.y-s, width: s*2, height: s*2)),
                        with: .color(Color.cyan.opacity(alpha * 0.5)), lineWidth: 0.5)
 
-        case .star:
+        case .star, .sun, .moon, .planet:
             break
         }
 
@@ -256,6 +260,112 @@ struct SkyChartView: View {
             Text(obj.name).font(.system(size: 9)).foregroundStyle(labelColor.opacity(selected ? 0.9 : 0.6)),
             at: CGPoint(x: pt.x + s + 2, y: pt.y - 4), anchor: .topLeading
         )
+    }
+
+    // MARK: - Solar System Drawing
+
+    private func drawSun(_ obj: SkyObject, at pt: CGPoint, in ctx: GraphicsContext) {
+        let selected = obj.id == vm.selectedObject?.id
+        let r: Double = 10
+        // Glow
+        ctx.fill(Path(ellipseIn: CGRect(x: pt.x-r*2.5, y: pt.y-r*2.5, width: r*5, height: r*5)),
+                 with: .color(Color.yellow.opacity(0.12)))
+        ctx.fill(Path(ellipseIn: CGRect(x: pt.x-r*1.6, y: pt.y-r*1.6, width: r*3.2, height: r*3.2)),
+                 with: .color(Color.yellow.opacity(0.2)))
+        // Disk
+        ctx.fill(Path(ellipseIn: CGRect(x: pt.x-r, y: pt.y-r, width: r*2, height: r*2)),
+                 with: .color(Color.yellow.opacity(0.95)))
+        if selected {
+            let sr = r + 5
+            ctx.stroke(Path(ellipseIn: CGRect(x: pt.x-sr, y: pt.y-sr, width: sr*2, height: sr*2)),
+                       with: .color(Color.astroAmber), lineWidth: 1.5)
+        }
+        ctx.draw(Text(obj.name).font(.system(size: 9)).foregroundStyle(Color.yellow.opacity(selected ? 1 : 0.7)),
+                 at: CGPoint(x: pt.x + r + 2, y: pt.y - 4), anchor: .topLeading)
+    }
+
+    private func drawMoon(_ obj: SkyObject, at pt: CGPoint, in ctx: GraphicsContext) {
+        let selected = obj.id == vm.selectedObject?.id
+        let r: Double = 8
+        // obj.phase = signed elongation in degrees; + east (waxing), - west (waning)
+        let elong  = obj.phase
+        let k      = (1 - cos(elong * .pi / 180)) / 2   // illumination 0–1
+        let waxing = elong >= 0
+
+        // Phase angle of terminator: 0 = new (thin crescent), π/2 = quarter, π = full
+        let phaseAngle = acos(max(-1.0, min(1.0, 1.0 - 2.0 * k)))
+        let tx = abs(r * cos(phaseAngle))  // terminator ellipse half-width
+
+        let moonRect = CGRect(x: pt.x - r, y: pt.y - r, width: r * 2, height: r * 2)
+
+        ctx.drawLayer { inner in
+            inner.clip(to: Path(ellipseIn: moonRect))
+
+            if k < 0.5 {
+                // Crescent: fill dark, add lit half, cut with terminator
+                inner.fill(Path(ellipseIn: moonRect), with: .color(.black))
+                var litHalf = Path()
+                if waxing { litHalf.addRect(CGRect(x: pt.x, y: pt.y - r, width: r, height: r * 2)) }
+                else      { litHalf.addRect(CGRect(x: pt.x - r, y: pt.y - r, width: r, height: r * 2)) }
+                inner.fill(litHalf, with: .color(.white.opacity(0.92)))
+                // Dark terminator ellipse cuts into the lit half
+                inner.fill(Path(ellipseIn: CGRect(x: pt.x - tx, y: pt.y - r, width: tx * 2, height: r * 2)),
+                           with: .color(.black))
+            } else {
+                // Gibbous / full: fill white, add dark half, lighten with terminator
+                inner.fill(Path(ellipseIn: moonRect), with: .color(.white.opacity(0.92)))
+                var darkHalf = Path()
+                if waxing { darkHalf.addRect(CGRect(x: pt.x - r, y: pt.y - r, width: r, height: r * 2)) }
+                else      { darkHalf.addRect(CGRect(x: pt.x, y: pt.y - r, width: r, height: r * 2)) }
+                inner.fill(darkHalf, with: .color(.black))
+                // White terminator ellipse cuts into the dark half
+                inner.fill(Path(ellipseIn: CGRect(x: pt.x - tx, y: pt.y - r, width: tx * 2, height: r * 2)),
+                           with: .color(.white.opacity(0.92)))
+            }
+        }
+
+        ctx.stroke(Path(ellipseIn: moonRect), with: .color(.white.opacity(0.5)), lineWidth: 0.5)
+
+        if selected {
+            let sr = r + 5
+            ctx.stroke(Path(ellipseIn: CGRect(x: pt.x - sr, y: pt.y - sr, width: sr * 2, height: sr * 2)),
+                       with: .color(Color.astroAmber), lineWidth: 1.5)
+        }
+        ctx.draw(Text(obj.name).font(.system(size: 9)).foregroundStyle(Color.white.opacity(selected ? 1 : 0.7)),
+                 at: CGPoint(x: pt.x + r + 2, y: pt.y - 4), anchor: .topLeading)
+    }
+
+    private func drawPlanet(_ obj: SkyObject, at pt: CGPoint, in ctx: GraphicsContext) {
+        let selected = obj.id == vm.selectedObject?.id
+        let r: Double = 4
+        let color = planetColor(obj.name)
+        // Soft glow for bright planets
+        if obj.magnitude < 0 {
+            ctx.fill(Path(ellipseIn: CGRect(x: pt.x - r*2, y: pt.y - r*2, width: r*4, height: r*4)),
+                     with: .color(color.opacity(0.2)))
+        }
+        ctx.fill(Path(ellipseIn: CGRect(x: pt.x - r, y: pt.y - r, width: r*2, height: r*2)),
+                 with: .color(color.opacity(0.95)))
+        if selected {
+            let sr = r + 5
+            ctx.stroke(Path(ellipseIn: CGRect(x: pt.x - sr, y: pt.y - sr, width: sr*2, height: sr*2)),
+                       with: .color(Color.astroAmber), lineWidth: 1)
+        }
+        ctx.draw(Text(obj.name).font(.system(size: 9)).foregroundStyle(color.opacity(selected ? 1 : 0.75)),
+                 at: CGPoint(x: pt.x + r + 2, y: pt.y - 4), anchor: .topLeading)
+    }
+
+    private func planetColor(_ name: String) -> Color {
+        switch name {
+        case "Mercury": return Color(red: 0.7, green: 0.7, blue: 0.7)
+        case "Venus":   return Color(red: 1.0, green: 0.95, blue: 0.7)
+        case "Mars":    return Color(red: 1.0, green: 0.4, blue: 0.2)
+        case "Jupiter": return Color(red: 1.0, green: 0.8, blue: 0.6)
+        case "Saturn":  return Color(red: 0.9, green: 0.85, blue: 0.6)
+        case "Uranus":  return Color(red: 0.6, green: 0.9, blue: 1.0)
+        case "Neptune": return Color(red: 0.3, green: 0.5, blue: 1.0)
+        default:        return .white
+        }
     }
 
     private func drawHorizonLine(in ctx: GraphicsContext, size: CGSize) {
@@ -308,9 +418,12 @@ struct SkyChartView: View {
 
     private func drawLegend(in ctx: GraphicsContext, size: CGSize) {
         let x: Double = 14
-        var y = size.height - 112.0
+        var y = size.height - 144.0
         let step: Double = 16
         let entries: [(String, Color)] = [
+            ("Sun",            .yellow),
+            ("Moon",           .white),
+            ("Planet",         Color(red: 1.0, green: 0.8, blue: 0.5)),
             ("Star",           .white),
             ("Open Cluster",   .yellow),
             ("Glob. Cluster",  .yellow),
@@ -503,7 +616,7 @@ struct SkyChartView: View {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(obj.name).font(.headline)
-                    Text("\(obj.type.displayName) · Mag \(String(format: "%.1f", obj.magnitude))")
+                    Text(obj.cardSubtitle)
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -605,7 +718,7 @@ struct SkyChartView: View {
         case .nebula:                        return .green
         case .galaxy:                        return Color(red: 0.8, green: 0.6, blue: 1.0)
         case .planetaryNebula:               return .cyan
-        case .star:                          return .white
+        default:                             return .white
         }
     }
 }

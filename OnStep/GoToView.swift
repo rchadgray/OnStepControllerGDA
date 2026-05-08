@@ -12,6 +12,18 @@ struct GoToView: View {
     @State private var showAlert    = false
     @State private var searchText   = ""
     @State private var selectedType: SkyObjectType? = nil
+    @State private var showSolarSystem  = false
+    @State private var solarSystemBodies: [SkyObject] = []
+
+    private var visibleSolarSystemBodies: [SkyObject] {
+        guard locationManager.locationReceived else { return solarSystemBodies }
+        let lat = locationManager.latitude
+        let lon = locationManager.longitude
+        let now = Date()
+        return solarSystemBodies.filter {
+            altitudeDeg(ra: $0.ra, dec: $0.dec, lat: lat, lon: lon, date: now) >= 10.0
+        }
+    }
     @FocusState private var focusedField: Field?
 
     enum Field { case ra, dec }
@@ -21,11 +33,11 @@ struct GoToView: View {
     }
 
     private var shouldShowList: Bool {
-        selectedType != nil || searchText.count >= 3
+        selectedType != nil || searchText.count >= 3 || showSolarSystem
     }
 
     private var filteredObjects: [SkyObject] {
-        guard shouldShowList else { return [] }
+        guard selectedType != nil || searchText.count >= 3 else { return [] }
 
         var pool = SkyCatalog.all
         pool = pool.filter { $0.type != .star || $0.magnitude <= 4.0 }
@@ -136,6 +148,25 @@ struct GoToView: View {
 
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
+                            // Solar System chip
+                            Button {
+                                if showSolarSystem {
+                                    showSolarSystem = false
+                                } else {
+                                    showSolarSystem = true
+                                    selectedType = nil
+                                }
+                            } label: {
+                                Text("Solar System")
+                                    .font(.caption).fontWeight(.semibold)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(showSolarSystem ? Color.astroRed : Color.secondary.opacity(0.2))
+                                    .foregroundStyle(showSolarSystem ? .white : .primary)
+                                    .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+
                             ForEach(Self.typeOrder, id: \.rawValue) { type in
                                 categoryChip(type)
                             }
@@ -156,7 +187,26 @@ struct GoToView: View {
                 }
 
                 // ── Results ───────────────────────────────────────────────────
-                if shouldShowList {
+                if showSolarSystem {
+                    Section {
+                        ForEach(visibleSolarSystemBodies) { body in
+                            solarRow(body)
+                        }
+                        if visibleSolarSystemBodies.isEmpty {
+                            Text("No solar system objects are currently above 10° at your location.")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    } header: {
+                        Text("Solar System")
+                    } footer: {
+                        if locationManager.locationReceived {
+                            Text("Showing objects currently above 10° at your location.")
+                        } else {
+                            Text("Enable location access to filter by visibility.")
+                        }
+                    }
+                } else if shouldShowList {
                     ForEach(objectsByType, id: \.0.rawValue) { (type, objects) in
                         Section(selectedType == nil ? type.displayName : "") {
                             ForEach(objects) { obj in
@@ -173,6 +223,9 @@ struct GoToView: View {
                 }
             }
             .navigationTitle("GoTo")
+            .task {
+                solarSystemBodies = SolarSystem.bodies()
+            }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     trackingIndicator
@@ -199,6 +252,29 @@ struct GoToView: View {
         }
         .foregroundStyle(telescope.isConnected && telescope.mountStatus.isTracking
                          ? Color.astroAmber : Color.secondary)
+    }
+
+    // MARK: - Solar System Row
+
+    @ViewBuilder
+    private func solarRow(_ obj: SkyObject) -> some View {
+        Button {
+            focusedField = nil
+            targetName = obj.name
+            targetRA   = formatRA(obj.ra)
+            targetDec  = formatDec(obj.dec)
+        } label: {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(obj.name).foregroundStyle(Color.primary)
+                    Text(obj.cardSubtitle)
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Image(systemName: "scope")
+                    .font(.caption).foregroundStyle(.tertiary)
+            }
+        }
     }
 
     // MARK: - Object Row
@@ -247,7 +323,12 @@ struct GoToView: View {
     private func categoryChip(_ type: SkyObjectType) -> some View {
         let selected = selectedType == type
         Button {
-            selectedType = selected ? nil : type
+            if selected {
+                selectedType = nil
+            } else {
+                selectedType = type
+                showSolarSystem = false
+            }
         } label: {
             Text(chipLabel(type))
                 .font(.caption).fontWeight(.semibold)
@@ -268,6 +349,7 @@ struct GoToView: View {
         case .nebula:            return "Nebula"
         case .galaxy:            return "Galaxy"
         case .planetaryNebula:   return "Planetary Neb"
+        default:                 return type.displayName
         }
     }
 

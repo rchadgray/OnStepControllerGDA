@@ -39,6 +39,7 @@ final class SkyChartViewModel: ObservableObject {
     var meridianLimitWestPier: Double? = nil
 
     let catalog: [SkyObject] = SkyCatalog.all
+    private(set) var solarSystem: [SkyObject] = SolarSystem.bodies()
 
     // Syncs observer location, sidereal time, mount position, and limits from live app state.
     func update(latitude: Double, longitude: Double, raString: String, decString: String,
@@ -51,6 +52,7 @@ final class SkyChartViewModel: ObservableObject {
         self.overheadLimit          = overheadLimit
         self.meridianLimitEastPier  = meridianLimitEastPier
         self.meridianLimitWestPier  = meridianLimitWestPier
+        self.solarSystem            = SolarSystem.bodies()
 
         if let ra = parseRA(raString), let dec = parseDec(decString) {
             let (alt, az) = altAzFor(ra: ra, dec: dec)
@@ -168,13 +170,12 @@ final class SkyChartViewModel: ObservableObject {
         return 1.5
     }
 
-    // Returns catalog objects above the horizon that pass the current magnitude filter,
-    // with their projected screen positions. Filtered per-type so DSO limits don't
-    // cut off faint galaxies when there's still room for more bright stars.
+    // Returns catalog and solar system objects above the horizon that pass the magnitude
+    // filter, with projected screen positions. Solar system bodies are always included.
     func visibleProjections(for size: CGSize) -> [(obj: SkyObject, pt: CGPoint)] {
         let starLimit = limitingStarMagnitude
         let dsoLimit  = limitingDSOMagnitude
-        return catalog.compactMap { obj in
+        var result = catalog.compactMap { obj -> (SkyObject, CGPoint)? in
             let limit = obj.type == .star ? starLimit : dsoLimit
             guard obj.magnitude <= limit else { return nil }
             let (alt, az) = altAzFor(ra: obj.ra, dec: obj.dec)
@@ -182,9 +183,16 @@ final class SkyChartViewModel: ObservableObject {
             guard let pt = project(alt: alt, az: az, in: size) else { return nil }
             return (obj, pt)
         }
+        for body in solarSystem {
+            let (alt, az) = altAzFor(ra: body.ra, dec: body.dec)
+            guard alt > -5.0 else { continue }
+            guard let pt = project(alt: alt, az: az, in: size) else { continue }
+            result.append((body, pt))
+        }
+        return result
     }
 
-    // Hit-test: nearest catalog object within 28 pt of a tap point, or nil.
+    // Hit-test: nearest object within 28 pt of a tap, solar system bodies preferred.
     func nearestObject(to tap: CGPoint, in size: CGSize) -> (SkyObject, CGPoint)? {
         var best: (SkyObject, CGPoint)? = nil
         var bestDist = 28.0
