@@ -165,16 +165,11 @@ struct AlignmentPanelView: View {
                 .cornerRadius(12)
                 .padding(.horizontal)
 
-                VStack(alignment: .leading, spacing: 6) {
-                    Label("< 5'  — Good for visual observing",      systemImage: "eye")
-                    Label("< 1'  — Suitable for astrophotography",  systemImage: "camera")
-                    Label("Adjust alt/az bolts to reduce both values toward zero.",
-                          systemImage: "arrow.down.to.line")
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal)
+                Text("Adjust the mount's alt/az bolts to reduce both values toward zero.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal)
 
                 Button {
                     appState.alignmentShowPanel = false

@@ -22,9 +22,11 @@ struct SetupView: View {
         return -iOSOffset
     }()
 
-    @State private var alignStarCount        = 2
-    @State private var showHoming            = false
-    @State private var showHomeConfirmation  = false
+    @State private var alignStarCount             = 2
+    @State private var showHoming                 = false
+    @State private var showHomeConfirmation       = false
+    @State private var showAlignmentConfirmation  = false
+    @State private var startAlignmentAfterHoming  = false
     @State private var showBTScanSheet       = false
     @State private var showWiFiSheet         = false
     @State private var now                   = Date.now
@@ -56,7 +58,26 @@ struct SetupView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showHoming) {
+            .sheet(isPresented: $showHoming, onDismiss: {
+                guard startAlignmentAfterHoming else { return }
+                startAlignmentAfterHoming = false
+                appState.alignmentStarCount      = alignStarCount
+                appState.alignmentTotalStars     = 0
+                appState.alignmentNextStar       = 1
+                appState.alignmentUsedStarNames  = []
+                appState.alignmentIsComplete     = false
+                appState.alignmentCurrentStarName = ""
+                appState.alignmentCurrentRA      = ""
+                appState.alignmentCurrentDec     = ""
+                telescope.startAlignment(starCount: alignStarCount) {
+                    telescope.queryAlignmentStatus { _, next, total in
+                        appState.alignmentTotalStars = total > 0 ? total : alignStarCount
+                        appState.alignmentNextStar   = max(1, next)
+                    }
+                }
+                appState.isAligning  = true
+                appState.selectedTab = AppState.tabSky
+            }) {
                 HomingView(isPresented: $showHoming)
                     .environmentObject(telescope)
             }
@@ -259,10 +280,35 @@ struct SetupView: View {
 
                 Button {
                     if telescope.mountStatus.alignmentInProgress {
+                        // Resume an in-progress session — no :An# sent, model unchanged.
                         appState.alignmentStarCount  = telescope.mountStatus.alignmentTotalStars
                         appState.alignmentTotalStars = telescope.mountStatus.alignmentTotalStars
                         appState.alignmentNextStar   = telescope.mountStatus.alignmentNextStar
+                        appState.isAligning  = true
+                        appState.selectedTab = AppState.tabSky
                     } else {
+                        // Fresh start — warn first because :An# resets the pointing model.
+                        showAlignmentConfirmation = true
+                    }
+                } label: {
+                    Label(telescope.mountStatus.alignmentInProgress
+                          ? "Continue Alignment…"
+                          : "Begin Star Alignment…",
+                          systemImage: "star.circle")
+                }
+                .foregroundStyle(Color.astroRed)
+                .disabled(!canAlign)
+                .confirmationDialog(
+                    "Mount Must Be at Home Position",
+                    isPresented: $showAlignmentConfirmation,
+                    titleVisibility: .visible
+                ) {
+                    Button("Find Home (uses home switches)") {
+                        startAlignmentAfterHoming = true
+                        telescope.goHome()
+                        showHoming = true
+                    }
+                    Button("Mount Is at Home — Begin Alignment", role: .destructive) {
                         appState.alignmentStarCount      = alignStarCount
                         appState.alignmentTotalStars     = 0
                         appState.alignmentNextStar       = 1
@@ -277,17 +323,13 @@ struct SetupView: View {
                                 appState.alignmentNextStar   = max(1, next)
                             }
                         }
+                        appState.isAligning  = true
+                        appState.selectedTab = AppState.tabSky
                     }
-                    appState.isAligning  = true
-                    appState.selectedTab = AppState.tabSky
-                } label: {
-                    Label(telescope.mountStatus.alignmentInProgress
-                          ? "Continue Alignment…"
-                          : "Begin Star Alignment…",
-                          systemImage: "star.circle")
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("Star alignment requires the mount to be at its home position (pointing at the North Celestial Pole). Use 'Find Home' if your mount has home switches, or manually slew the mount to NCP before proceeding. Starting alignment will reset the current pointing model.")
                 }
-                .foregroundStyle(Color.astroRed)
-                .disabled(!canAlign)
             }
         } header: {
             Text("Star Alignment")
@@ -299,7 +341,7 @@ struct SetupView: View {
             } else if telescope.mountStatus.isAligned {
                 Text("Alignment complete.")
             } else {
-                Text("Home the mount first. GoTo each star, center it in the eyepiece, then accept.")
+                Text("On the Sky Chart, tap a star and choose GoTo to slew to it. Center it in the eyepiece, then accept.")
             }
         }
     }
