@@ -11,7 +11,6 @@
 		07542CC22FAB713300D3F522 /* CONTRIBUTING.md in Resources */ = {isa = PBXBuildFile; fileRef = 07542CC02FAB713300D3F522 /* CONTRIBUTING.md */; };
 		07542CC32FAB713300D3F522 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 07542CC12FAB713300D3F522 /* README.md */; };
 		07542CC72FAB76C700D3F522 /* LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = 07542CC62FAB76C700D3F522 /* LICENSE */; };
-		07542CEF2FAD6E4B00D3F522 /* SolarSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07542CEE2FAD6E4B00D3F522 /* SolarSystem.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -32,7 +31,6 @@
 		07542CC02FAB713300D3F522 /* CONTRIBUTING.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CONTRIBUTING.md; sourceTree = "<group>"; };
 		07542CC12FAB713300D3F522 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		07542CC62FAB76C700D3F522 /* LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
-		07542CEE2FAD6E4B00D3F522 /* SolarSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SolarSystem.swift; sourceTree = "<group>"; };
 		07B3C00C2F9D589700F47F88 /* OnStep.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OnStep.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -77,7 +75,6 @@
 				07542CBE2FAB711F00D3F522 /* .gitignore */,
 				07B3C00E2F9D589700F47F88 /* OnStep */,
 				07B3C00D2F9D589700F47F88 /* Products */,
-				07542CEE2FAD6E4B00D3F522 /* SolarSystem.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -168,7 +165,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				07542CEF2FAD6E4B00D3F522 /* SolarSystem.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
