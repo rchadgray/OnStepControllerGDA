@@ -21,6 +21,7 @@ struct SkyChartView: View {
         NavigationStack {
             GeometryReader { geo in
                 ZStack(alignment: .bottom) {
+                    // Black background extends behind the tab bar.
                     Color.black.ignoresSafeArea()
 
                     Canvas { ctx, size in
@@ -38,6 +39,7 @@ struct SkyChartView: View {
 
                     if let obj = vm.selectedObject {
                         objectCard(for: obj)
+                            .padding(.bottom, 8)
                     }
 
                     // Alignment mode banner — overlaid at the top
@@ -49,7 +51,6 @@ struct SkyChartView: View {
                     }
                 }
             }
-            .ignoresSafeArea(.all, edges: .bottom)
             .navigationTitle("Sky Chart")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -612,6 +613,14 @@ struct SkyChartView: View {
     // MARK: - Selected Object Card
 
     private func objectCard(for obj: SkyObject) -> some View {
+        // In landscape (compact height) use a single-row layout to save vertical space.
+        ViewThatFits(in: .vertical) {
+            objectCardTall(for: obj)
+            objectCardCompact(for: obj)
+        }
+    }
+
+    private func objectCardTall(for obj: SkyObject) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 3) {
@@ -625,49 +634,75 @@ struct SkyChartView: View {
                 }
                 .buttonStyle(.plain)
             }
-
-            if goToIssued || telescope.mountStatus.isMoving {
-                // GoTo issued or slew in progress — show Cancel so user can't queue another GoTo
-                Button {
-                    goToIssued = false
-                    telescope.stopAll()
-                } label: {
-                    Label("Cancel GoTo", systemImage: "stop.circle.fill")
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                        .background(Color.red)
-                        .foregroundStyle(Color.white)
-                        .cornerRadius(8)
-                }
-                .buttonStyle(.plain)
-            } else {
-                let buttonLabel = appState.isAligning
-                    ? "GoTo — Align Star \(appState.alignmentNextStar)"
-                    : "GoTo"
-
-                Button {
-                    if appState.isAligning {
-                        appState.alignmentCurrentStarName = obj.name
-                        appState.alignmentCurrentRA  = raString(obj.ra)
-                        appState.alignmentCurrentDec = decString(obj.dec)
-                    }
-                    issueGoTo(obj)
-                } label: {
-                    Label(buttonLabel, systemImage: "location.north.line.fill")
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                        .background(telescope.isConnected ? Color.astroRed : Color.secondary.opacity(0.3))
-                        .foregroundStyle(telescope.isConnected ? Color.white : Color.secondary)
-                        .cornerRadius(8)
-                }
-                .disabled(!telescope.isConnected)
-            }
+            cardActionButton(for: obj)
         }
         .padding()
         .background(.ultraThinMaterial)
         .cornerRadius(16)
         .padding(.horizontal)
         .padding(.bottom, 8)
+    }
+
+    private func objectCardCompact(for obj: SkyObject) -> some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(obj.name).font(.headline)
+                Text(obj.cardSubtitle)
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            cardActionButton(for: obj)
+                .fixedSize()
+            Button { vm.selectedObject = nil } label: {
+                Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 10)
+        .background(.ultraThinMaterial)
+        .cornerRadius(16)
+        .padding(.horizontal)
+        .padding(.bottom, 8)
+    }
+
+    @ViewBuilder
+    private func cardActionButton(for obj: SkyObject) -> some View {
+        if goToIssued || telescope.mountStatus.isMoving {
+            Button {
+                goToIssued = false
+                telescope.stopAll()
+            } label: {
+                Label("Cancel GoTo", systemImage: "stop.circle.fill")
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(Color.red)
+                    .foregroundStyle(Color.white)
+                    .cornerRadius(8)
+            }
+            .buttonStyle(.plain)
+        } else {
+            let buttonLabel = appState.isAligning
+                ? "GoTo — Align Star \(appState.alignmentNextStar)"
+                : "GoTo"
+            Button {
+                if appState.isAligning {
+                    appState.alignmentCurrentStarName = obj.name
+                    appState.alignmentCurrentRA  = raString(obj.ra)
+                    appState.alignmentCurrentDec = decString(obj.dec)
+                }
+                issueGoTo(obj)
+            } label: {
+                Label(buttonLabel, systemImage: "location.north.line.fill")
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(telescope.isConnected ? Color.astroRed : Color.secondary.opacity(0.3))
+                    .foregroundStyle(telescope.isConnected ? Color.white : Color.secondary)
+                    .cornerRadius(8)
+            }
+            .buttonStyle(.plain)
+            .disabled(!telescope.isConnected)
+        }
     }
 
     // MARK: - Tracking Indicator
